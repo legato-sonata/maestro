@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "record": "xvfb-run --auto-servernum node --env-file=maestro.env record.js"
+    "record": "pulseaudio --start && xvfb-run --auto-servernum node --env-file=maestro.env record.js"
   },
   "dependencies": {
     "playwright": "latest"
