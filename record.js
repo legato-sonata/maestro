@@ -51,16 +51,21 @@ async function executeRecordingSession() {
     
     const ffmpegProcess = spawn('ffmpeg', [
         '-y', 
+        '-use_wallclock_as_timestamps', '1',
+        '-thread_queue_size', '1024',
         '-f', 'x11grab', 
         '-video_size', viewportWidth + 'x' + viewportHeight,
         '-framerate', '30',
         '-i', displayPort, 
+        '-use_wallclock_as_timestamps', '1',
+        '-thread_queue_size', '1024',
         '-f', 'pulse',
         '-i', 'default',
         '-c:v', 'libx264',
         '-preset', 'ultrafast',
         '-b:v', '10M',
         '-c:a', 'aac',
+        '-fps_mode', 'cfr',
         'output.mp4'
     ]);
     
