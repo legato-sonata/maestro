@@ -71,7 +71,7 @@ if [ "$CLEANUP_MODE" == "stop" ]; then
     gh codespace stop --codespace $CODESPACE_ID
 else
     echo "Deleting the codespace to prevent quota consumption..."
-    gh codespace delete --codespace $CODESPACE_ID
+    gh codespace delete --codespace $CODESPACE_ID --force
 fi
 
 echo "Process finished. The file 'demo-recording.mp4' is now available locally."
