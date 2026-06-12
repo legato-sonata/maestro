@@ -38,8 +38,8 @@ if [ -n "$EXISTING_CODESPACE" ] && [ "$EXISTING_CODESPACE" != "null" ]; then
     CODESPACE_ID=$EXISTING_CODESPACE
 else
     echo "Creating new Codespace..."
-    # The --json and --jq flags extract only the raw Codespace ID string
-    CODESPACE_ID=$(gh codespace create --repo $FULL_REPO_PATH --branch $BRANCH --machine $MACHINE_TYPE --json name --jq .name)
+    # When output is redirected/captured, gh codespace create prints only the Codespace name
+    CODESPACE_ID=$(gh codespace create --repo "$FULL_REPO_PATH" --branch "$BRANCH" --machine "$MACHINE_TYPE")
 
     if [ -z "$CODESPACE_ID" ]; then
         echo "Fatal Error: Codespace creation failed."
