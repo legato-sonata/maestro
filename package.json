@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "record": "bash -c 'source maestro.env && xvfb-run --server-args=\"-screen 0 ${VIEWPORT_WIDTH:-1280}x${VIEWPORT_HEIGHT:-720}x24\" --auto-servernum bash -c \"pulseaudio -D --exit-idle-time=-1 || true; sleep 1; node --env-file=maestro.env record.js\"'"
+    "record": "bash maestro-x.sh"
   },
   "dependencies": {
     "playwright": "latest"
