@@ -56,14 +56,6 @@ async function executeRecordingSession() {
     console.log("Navigating to URL...");
     await page.goto(targetUrl, { timeout: 0 });
     
-    // Attempt to force fullscreen (hides tabs and URL bar)
-    try {
-        await page.keyboard.press('F11');
-        await page.waitForTimeout(500);
-    } catch (e) {
-        console.log("Could not press F11", e);
-    }
-    
     // 3. Start the FFmpeg recording process
     console.log("Starting FFmpeg recording...");
     const displayPort = process.env.DISPLAY || ':99';
@@ -97,7 +89,18 @@ async function executeRecordingSession() {
     });
     
     // Give FFmpeg a brief moment to initialize before playing audio
-    await page.waitForTimeout(1000);
+    // And give the page some extra time to fully load before interaction
+    console.log("Waiting before interacting...");
+    await page.waitForTimeout(5000);
+    
+    // Attempt to force fullscreen (hides tabs and URL bar)
+    try {
+        console.log("Pressing F11 for fullscreen...");
+        await page.keyboard.press('F11');
+        await page.waitForTimeout(1000);
+    } catch (e) {
+        console.log("Could not press F11", e);
+    }
     
     // 3.5 Attempt to interact and play music
     console.log("Attempting to start audio playback...");
