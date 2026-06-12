@@ -1,12 +1,17 @@
 #!/bin/bash
 
-# Configuration
-# Replace 'your-username' and 'your-repo-name' with your actual GitHub details
-GITHUB_USERNAME="your-username"
-REPOSITORY_NAME="your-repo-name"
+# Load configuration
+if [ -f maestro.env ]; then
+    set -a
+    source maestro.env
+    set +a
+else
+    echo "Fatal Error: maestro.env configuration file not found."
+    echo "Please create maestro.env with your configuration settings."
+    exit 1
+fi
+
 FULL_REPO_PATH="$GITHUB_USERNAME/$REPOSITORY_NAME"
-BRANCH="main"
-MACHINE_TYPE="standardLinux32gb"
 
 echo "Step 1: Creating Codespace for $FULL_REPO_PATH"
 # The --json and --jq flags extract only the raw Codespace ID string
