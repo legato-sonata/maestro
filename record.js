@@ -29,7 +29,7 @@ async function executeRecordingSession() {
     
     // 3. Start the FFmpeg recording process
     console.log("Starting FFmpeg recording...");
-    const displayPort = process.env.DISPLAY;
+    const displayPort = process.env.DISPLAY || ':99';
     
     const ffmpegProcess = spawn('ffmpeg', [
         '-y', 
@@ -40,6 +40,14 @@ async function executeRecordingSession() {
         '-preset', 'ultrafast',
         'output.mp4'
     ]);
+    
+    ffmpegProcess.stderr.on('data', (data) => {
+        console.error(`FFMPEG LOG: ${data}`);
+    });
+    
+    ffmpegProcess.on('error', (err) => {
+        console.error(`FFMPEG ERROR: ${err}`);
+    });
     
     // Give FFmpeg a brief moment to initialize before playing audio
     await page.waitForTimeout(1000);
@@ -74,8 +82,15 @@ async function executeRecordingSession() {
     
     // 5. Terminate processes
     console.log("Stopping recording and closing browser...");
-    ffmpegProcess.kill('SIGINT');
     await browser.close();
+    
+    // Send SIGINT and wait for FFmpeg to flush the MP4 moov atom
+    ffmpegProcess.kill('SIGINT');
+    await new Promise((resolve) => {
+        ffmpegProcess.on('exit', resolve);
+        // Fallback timeout in case FFmpeg hangs
+        setTimeout(resolve, 3000);
+    });
     console.log("Recording session complete.");
 }
 
