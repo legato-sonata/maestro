@@ -77,6 +77,7 @@ async function executeRecordingSession() {
 
     try {
       const playSelectors = [
+        'button:has(polygon[points="6 3 20 12 6 21 6 3"])',
         '.ytp-large-play-button',
         '.ytp-play-button',
         '.play-button',
