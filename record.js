@@ -29,6 +29,7 @@ async function executeRecordingSession() {
     console.log("Launching Chromium...");
     const browser = await chromium.launch({
         headless: false, 
+        ignoreDefaultArgs: ['--enable-automation'],
         args: [
             '--window-size=' + viewportWidth + ',' + viewportHeight,
             '--window-position=0,0',
@@ -48,10 +49,20 @@ async function executeRecordingSession() {
     });
     
     const page = await context.newPage();
+    page.setDefaultTimeout(0);
+    page.setDefaultNavigationTimeout(0);
     
     // 2. Navigate to the target URL
     console.log("Navigating to URL...");
-    await page.goto(targetUrl);
+    await page.goto(targetUrl, { timeout: 0 });
+    
+    // Attempt to force fullscreen (hides tabs and URL bar)
+    try {
+        await page.keyboard.press('F11');
+        await page.waitForTimeout(500);
+    } catch (e) {
+        console.log("Could not press F11", e);
+    }
     
     // 3. Start the FFmpeg recording process
     console.log("Starting FFmpeg recording...");
