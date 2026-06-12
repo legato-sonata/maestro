@@ -1,0 +1,5 @@
+{
+    "name": "Playwright Media Processing",
+    "image": "mcr.microsoft.com/devcontainers/javascript-node:22",
+    "postCreateCommand": "sudo apt-get update && sudo apt-get install -y xvfb ffmpeg pulseaudio && npm install && npx playwright install --with-deps chromium"
+}
