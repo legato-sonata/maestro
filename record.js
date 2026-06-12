@@ -58,17 +58,21 @@ async function executeRecordingSession() {
     // 3.5 Attempt to interact and play music
     console.log("Attempting to start audio playback...");
     
-    // Attempt to dismiss cookie consent popups (e.g., YouTube's "Accept all" / "Reject all")
+    // Attempt to dismiss cookie consent popups universally
     try {
-      const consentButton = page.locator('button:has-text("Accept all"), button:has-text("Reject all")').first();
-      // Use a fast timeout since it might not exist
-      if (await consentButton.isVisible({ timeout: 2000 })) {
-        console.log("Cookie consent popup found, dismissing...");
-        await consentButton.click();
-        await page.waitForTimeout(1000); // Wait for popup to disappear
-      }
+      await page.evaluate(() => {
+        const texts = ['accept all', 'i agree', 'accept', 'allow all'];
+        const btns = Array.from(document.querySelectorAll('button, a, [role="button"]'));
+        for (let b of btns) {
+          if (texts.includes(b.innerText.toLowerCase().trim())) {
+            b.click();
+            return;
+          }
+        }
+      });
+      await page.waitForTimeout(1000); // Wait for popup to disappear
     } catch (e) {
-      // Ignore errors if the popup isn't there
+      // Ignore
     }
 
     try {
@@ -85,17 +89,34 @@ async function executeRecordingSession() {
         
         for (const selector of playSelectors) {
             const el = page.locator(selector).first();
-            if (await el.count() > 0) {
-                await el.click();
-                console.log(`Clicked play button using selector: ${selector}`);
-                clicked = true;
-                break;
+            // Use a short timeout of 2000ms instead of waiting forever
+            try {
+                if (await el.isVisible({ timeout: 2000 })) {
+                    await el.click();
+                    console.log(`Clicked play button using selector: ${selector}`);
+                    clicked = true;
+                    break;
+                }
+            } catch (e) {
+                // Not visible, move on
             }
         }
         
         if (!clicked) {
-            console.log("No explicit play button found. Clicking center of screen as fallback.");
+            console.log("No explicit play button found. Attempting keyboard shortcuts and fallback clicks.");
+            // YouTube play/pause shortcut
+            await page.keyboard.press('k');
+            await page.waitForTimeout(500);
+            // Universal play shortcut
+            await page.keyboard.press('Space');
+            await page.waitForTimeout(500);
+            
             await page.mouse.click(viewportWidth / 2, viewportHeight / 2);
+            
+            // Force play any video elements
+            await page.evaluate(() => {
+                document.querySelectorAll('video, audio').forEach(v => v.play().catch(() => {}));
+            });
         }
     } catch (err) {
         console.log("Auto-play interaction failed:", err.message);
