@@ -47,7 +47,7 @@ async function executeRecordingSession() {
     // 3.5 Attempt to interact and play music
     console.log("Attempting to start audio playback...");
     try {
-        const selectors = ['.play-item', '.play-btn', 'a.play', 'button[title="Play"]', '[aria-label="Play"]', '.c-action-play'];
+        const selectors = ['.playbtn', '.play-item', 'a.play', 'button[title="Play"]', '[aria-label="Play"]', '.c-action-play'];
         let clicked = false;
         
         for (const selector of selectors) {
