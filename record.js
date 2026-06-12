@@ -1,5 +1,23 @@
 import { chromium } from 'playwright';
 import { spawn } from 'child_process';
+import fs from 'fs';
+
+const logFile = 'maestro.log';
+fs.writeFileSync(logFile, ''); // Clear previous log
+
+const originalLog = console.log;
+console.log = function (...args) {
+    const msg = args.map(a => typeof a === 'object' ? JSON.stringify(a) : a).join(' ');
+    fs.appendFileSync(logFile, msg + '\n');
+    originalLog.apply(console, args);
+};
+
+const originalError = console.error;
+console.error = function (...args) {
+    const msg = args.map(a => typeof a === 'object' ? JSON.stringify(a) : a).join(' ');
+    fs.appendFileSync(logFile, 'ERROR: ' + msg + '\n');
+    originalError.apply(console, args);
+};
 
 async function executeRecordingSession() {
     const viewportWidth = parseInt(process.env.VIEWPORT_WIDTH) || 1280;

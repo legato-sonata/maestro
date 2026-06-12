@@ -62,6 +62,9 @@ echo "Step 4: Downloading the MP4 artifact..."
 # Securely copy the output.mp4 file to the local directory
 gh codespace cp -e "remote:/workspaces/$REPO_NAME/output.mp4" ./demo-recording.mp4 --codespace $CODESPACE_ID || { echo "Fatal Error: Failed to download artifact."; exit 1; }
 
+echo "Step 4.5: Downloading the log artifact..."
+gh codespace cp -e "remote:/workspaces/$REPO_NAME/maestro.log" ./maestro.log --codespace $CODESPACE_ID || echo "Warning: Failed to download log artifact."
+
 echo "Step 5: Cleaning up Codespace..."
 # Check cleanup mode (default to delete)
 CLEANUP_MODE=${CODESPACE_CLEANUP_MODE:-delete}
@@ -74,4 +77,4 @@ else
     gh codespace delete --codespace $CODESPACE_ID --force
 fi
 
-echo "Process finished. The file 'demo-recording.mp4' is now available locally."
+echo "Process finished. The files 'demo-recording.mp4' and 'maestro.log' are now available locally."
