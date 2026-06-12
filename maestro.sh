@@ -37,12 +37,15 @@ if [ -n "$EXISTING_CODESPACE" ] && [ "$EXISTING_CODESPACE" != "null" ]; then
     echo "Found existing Codespace: $EXISTING_CODESPACE. Reusing it."
     CODESPACE_ID=$EXISTING_CODESPACE
 else
-    echo "Creating new Codespace..."
-    # When output is redirected/captured, gh codespace create prints only the Codespace name
-    CODESPACE_ID=$(gh codespace create --repo "$FULL_REPO_PATH" --branch "$BRANCH" --machine "$MACHINE_TYPE")
+    echo "Creating new Codespace (streaming setup logs)..."
+    # Run in the foreground with --status so you can see the build progress
+    gh codespace create --repo "$FULL_REPO_PATH" --branch "$BRANCH" --machine "$MACHINE_TYPE" --status || { echo "Fatal Error: Codespace creation failed."; exit 1; }
+    
+    # Retrieve the ID of the newly created Codespace
+    CODESPACE_ID=$(gh codespace list --repo "$FULL_REPO_PATH" --json name -q '.[0].name' 2>/dev/null)
 
-    if [ -z "$CODESPACE_ID" ]; then
-        echo "Fatal Error: Codespace creation failed."
+    if [ -z "$CODESPACE_ID" ] || [ "$CODESPACE_ID" == "null" ]; then
+        echo "Fatal Error: Could not retrieve Codespace ID after creation."
         exit 1
     fi
     echo "Success: Codespace ID is $CODESPACE_ID"
