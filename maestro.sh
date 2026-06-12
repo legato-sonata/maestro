@@ -49,15 +49,15 @@ else
 fi
 
 echo "Step 2: Syncing local configuration to Codespace..."
-gh codespace cp ./maestro.env remote:/workspaces/$REPO_NAME/maestro.env --codespace $CODESPACE_ID
+gh codespace cp ./maestro.env remote:/workspaces/$REPO_NAME/maestro.env --codespace $CODESPACE_ID || { echo "Fatal Error: Failed to copy config. Is the Codespace fully initialized and did you push your code?"; exit 1; }
 
 echo "Step 3: Executing Node.js recording script..."
 # Run the npm script defined in package.json which includes xvfb-run
-gh codespace ssh --codespace $CODESPACE_ID -- "cd /workspaces/$REPO_NAME && npm run record"
+gh codespace ssh --codespace $CODESPACE_ID -- "cd /workspaces/$REPO_NAME && npm run record" || { echo "Fatal Error: Recording execution failed."; exit 1; }
 
 echo "Step 4: Downloading the MP4 artifact..."
 # Securely copy the output.mp4 file to the local directory
-gh codespace cp remote:/workspaces/$REPO_NAME/output.mp4 ./demo-recording.mp4 --codespace $CODESPACE_ID
+gh codespace cp remote:/workspaces/$REPO_NAME/output.mp4 ./demo-recording.mp4 --codespace $CODESPACE_ID || { echo "Fatal Error: Failed to download artifact. The video may not have been created."; exit 1; }
 
 echo "Step 5: Cleaning up Codespace..."
 # Check cleanup mode (default to delete)
