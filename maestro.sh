@@ -51,12 +51,13 @@ else
     echo "Success: Codespace ID is $CODESPACE_ID"
 fi
 
-echo "Step 2: Syncing local configuration to Codespace..."
+echo "Step 2: Syncing local configuration and script to Codespace..."
 gh codespace cp -e ./maestro.env "remote:/workspaces/$REPO_NAME/maestro.env" --codespace $CODESPACE_ID || { echo "Fatal Error: Failed to upload config."; exit 1; }
+gh codespace cp -e ./record.js "remote:/workspaces/$REPO_NAME/record.js" --codespace $CODESPACE_ID || { echo "Fatal Error: Failed to upload record.js."; exit 1; }
 
 echo "Step 3: Executing Node.js recording script..."
 # Ensure dependencies and playwright browsers are installed before running
-gh codespace ssh --codespace $CODESPACE_ID -- "cd /workspaces/$REPO_NAME && git pull && npm install && npx playwright install chromium && npm run record" || { echo "Fatal Error: Recording execution failed."; exit 1; }
+gh codespace ssh --codespace $CODESPACE_ID -- "cd /workspaces/$REPO_NAME && npm install && npx playwright install chromium && npm run record" || { echo "Fatal Error: Recording execution failed."; exit 1; }
 
 echo "Step 4: Downloading the MP4 artifact..."
 # Securely copy the output.mp4 file to the local directory

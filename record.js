@@ -29,11 +29,13 @@ async function executeRecordingSession() {
     console.log("Launching Chromium...");
     const browser = await chromium.launch({
         headless: false, 
+        ignoreDefaultArgs: ['--enable-automation'],
         args: [
             '--window-size=' + viewportWidth + ',' + viewportHeight,
             '--window-position=0,0',
             '--autoplay-policy=no-user-gesture-required',
             '--start-fullscreen',
+            '--start-maximized',
             '--kiosk',
             '--disable-infobars',
             '--disable-dev-shm-usage',
@@ -48,10 +50,12 @@ async function executeRecordingSession() {
     });
     
     const page = await context.newPage();
+    page.setDefaultTimeout(0);
+    page.setDefaultNavigationTimeout(0);
     
     // 2. Navigate to the target URL
     console.log("Navigating to URL...");
-    await page.goto(targetUrl);
+    await page.goto(targetUrl, { timeout: 0 });
     
     // 3. Start the FFmpeg recording process
     console.log("Starting FFmpeg recording...");
