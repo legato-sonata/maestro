@@ -30,27 +30,45 @@ if [ -z "$BRANCH" ] || [ "$BRANCH" == "main" ]; then
     BRANCH=$(git branch --show-current 2>/dev/null || echo "main")
 fi
 
-echo "Step 1: Creating Codespace for $FULL_REPO_PATH on branch $BRANCH..."
-# The --json and --jq flags extract only the raw Codespace ID string
-CODESPACE_ID=$(gh codespace create --repo $FULL_REPO_PATH --branch $BRANCH --machine $MACHINE_TYPE --json name --jq .name)
+echo "Step 1: Preparing Codespace for $FULL_REPO_PATH on branch $BRANCH..."
+EXISTING_CODESPACE=$(gh codespace list --repo $FULL_REPO_PATH --json name -q '.[0].name' 2>/dev/null)
 
-if [ -z "$CODESPACE_ID" ]; then
-    echo "Fatal Error: Codespace creation failed."
-    exit 1
+if [ -n "$EXISTING_CODESPACE" ] && [ "$EXISTING_CODESPACE" != "null" ]; then
+    echo "Found existing Codespace: $EXISTING_CODESPACE. Reusing it."
+    CODESPACE_ID=$EXISTING_CODESPACE
+else
+    echo "Creating new Codespace..."
+    # The --json and --jq flags extract only the raw Codespace ID string
+    CODESPACE_ID=$(gh codespace create --repo $FULL_REPO_PATH --branch $BRANCH --machine $MACHINE_TYPE --json name --jq .name)
+
+    if [ -z "$CODESPACE_ID" ]; then
+        echo "Fatal Error: Codespace creation failed."
+        exit 1
+    fi
+    echo "Success: Codespace ID is $CODESPACE_ID"
 fi
 
-echo "Success: Codespace ID is $CODESPACE_ID"
+echo "Step 2: Syncing local configuration to Codespace..."
+gh codespace cp ./maestro.env remote:/workspaces/$REPO_NAME/maestro.env --codespace $CODESPACE_ID
 
-echo "Step 2: Executing Node.js recording script..."
+echo "Step 3: Executing Node.js recording script..."
 # Run the npm script defined in package.json which includes xvfb-run
-gh codespace ssh --codespace $CODESPACE_ID -- "npm run record"
+gh codespace ssh --codespace $CODESPACE_ID -- "cd /workspaces/$REPO_NAME && npm run record"
 
-echo "Step 3: Downloading the MP4 artifact..."
+echo "Step 4: Downloading the MP4 artifact..."
 # Securely copy the output.mp4 file to the local directory
 gh codespace cp remote:/workspaces/$REPO_NAME/output.mp4 ./demo-recording.mp4 --codespace $CODESPACE_ID
 
-echo "Step 4: Deleting Codespace..."
-# Delete the codespace to prevent quota consumption
-gh codespace delete --codespace $CODESPACE_ID
+echo "Step 5: Cleaning up Codespace..."
+# Check cleanup mode (default to delete)
+CLEANUP_MODE=${CODESPACE_CLEANUP_MODE:-delete}
+
+if [ "$CLEANUP_MODE" == "stop" ]; then
+    echo "Stopping the codespace (to preserve for future use)..."
+    gh codespace stop --codespace $CODESPACE_ID
+else
+    echo "Deleting the codespace to prevent quota consumption..."
+    gh codespace delete --codespace $CODESPACE_ID
+fi
 
 echo "Process finished. The file 'demo-recording.mp4' is now available locally."
