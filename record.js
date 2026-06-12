@@ -41,6 +41,33 @@ async function executeRecordingSession() {
         'output.mp4'
     ]);
     
+    // Give FFmpeg a brief moment to initialize before playing audio
+    await page.waitForTimeout(1000);
+    
+    // 3.5 Attempt to interact and play music
+    console.log("Attempting to start audio playback...");
+    try {
+        const selectors = ['.play-item', '.play-btn', 'a.play', 'button[title="Play"]', '[aria-label="Play"]', '.c-action-play'];
+        let clicked = false;
+        
+        for (const selector of selectors) {
+            const el = page.locator(selector).first();
+            if (await el.count() > 0) {
+                await el.click();
+                console.log(`Clicked play button using selector: ${selector}`);
+                clicked = true;
+                break;
+            }
+        }
+        
+        if (!clicked) {
+            console.log("No explicit play button found. Clicking center of screen as fallback.");
+            await page.mouse.click(viewportWidth / 2, viewportHeight / 2);
+        }
+    } catch (err) {
+        console.log("Auto-play interaction failed:", err.message);
+    }
+    
     // 4. Wait for a specific duration to record
     console.log(`Recording for ${recordingDuration / 1000} seconds...`);
     await page.waitForTimeout(recordingDuration);
