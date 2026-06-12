@@ -57,11 +57,33 @@ async function executeRecordingSession() {
     
     // 3.5 Attempt to interact and play music
     console.log("Attempting to start audio playback...");
+    
+    // Attempt to dismiss cookie consent popups (e.g., YouTube's "Accept all" / "Reject all")
     try {
-        const selectors = ['.ytp-large-play-button', '.ytp-play-button', '.playbtn', '.play-item', 'a.play', 'button[title="Play"]', '[aria-label="Play"]', '.c-action-play'];
+      const consentButton = page.locator('button:has-text("Accept all"), button:has-text("Reject all")').first();
+      // Use a fast timeout since it might not exist
+      if (await consentButton.isVisible({ timeout: 2000 })) {
+        console.log("Cookie consent popup found, dismissing...");
+        await consentButton.click();
+        await page.waitForTimeout(1000); // Wait for popup to disappear
+      }
+    } catch (e) {
+      // Ignore errors if the popup isn't there
+    }
+
+    try {
+      const playSelectors = [
+        '.ytp-large-play-button',
+        '.ytp-play-button',
+        '.play-button',
+        '.play-item',
+        'button[aria-label="Play"]',
+        'button[title="Play"]',
+        'video'
+      ];
         let clicked = false;
         
-        for (const selector of selectors) {
+        for (const selector of playSelectors) {
             const el = page.locator(selector).first();
             if (await el.count() > 0) {
                 await el.click();
