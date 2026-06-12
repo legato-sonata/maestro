@@ -31,7 +31,15 @@ async function executeRecordingSession() {
         headless: false, 
         args: [
             '--window-size=' + viewportWidth + ',' + viewportHeight,
-            '--autoplay-policy=no-user-gesture-required'
+            '--window-position=0,0',
+            '--autoplay-policy=no-user-gesture-required',
+            '--start-fullscreen',
+            '--kiosk',
+            '--disable-infobars',
+            '--disable-dev-shm-usage',
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-gpu'
         ]
     });
     
@@ -62,8 +70,8 @@ async function executeRecordingSession() {
         '-f', 'pulse',
         '-i', 'default',
         '-c:v', 'libx264',
-        '-preset', 'ultrafast',
-        '-b:v', '10M',
+        '-preset', 'fast',
+        '-crf', '18',
         '-c:a', 'aac',
         '-fps_mode', 'cfr',
         'output.mp4'
