@@ -55,8 +55,8 @@ echo "Step 2: Syncing local configuration to Codespace..."
 gh codespace cp -e ./maestro.env "remote:/workspaces/$REPO_NAME/maestro.env" --codespace $CODESPACE_ID || { echo "Fatal Error: Failed to upload config."; exit 1; }
 
 echo "Step 3: Executing Node.js recording script..."
-# Run the npm script defined in package.json which includes xvfb-run
-gh codespace ssh --codespace $CODESPACE_ID -- "cd /workspaces/$REPO_NAME && git pull && npm run record" || { echo "Fatal Error: Recording execution failed."; exit 1; }
+# Ensure dependencies and playwright browsers are installed before running
+gh codespace ssh --codespace $CODESPACE_ID -- "cd /workspaces/$REPO_NAME && git pull && npm install && npx playwright install chromium && npm run record" || { echo "Fatal Error: Recording execution failed."; exit 1; }
 
 echo "Step 4: Downloading the MP4 artifact..."
 # Securely copy the output.mp4 file to the local directory
