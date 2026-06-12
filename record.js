@@ -34,7 +34,8 @@ async function executeRecordingSession() {
 
     console.log("Launching Chromium in App Mode with Playwright Video Recording...");
     
-    // 1. Launch persistent context with App Mode directly to the target URL
+    // 1. Launch persistent context with App Mode pointing to a blank data URI.
+    // This allows it to boot instantly, so video recording starts immediately at a known zero-point.
     const context = await chromium.launchPersistentContext('', {
         headless: false,
         ignoreDefaultArgs: ['--enable-automation'],
@@ -44,7 +45,7 @@ async function executeRecordingSession() {
             size: { width: viewportWidth, height: viewportHeight }
         },
         args: [
-            `--app=${targetUrl}`,
+            `--app=data:,`,
             `--window-size=${viewportWidth},${viewportHeight}`,
             '--window-position=0,0',
             '--autoplay-policy=no-user-gesture-required',
@@ -57,22 +58,12 @@ async function executeRecordingSession() {
         ]
     });
     
-    // Playwright native video starts right when context is created
-    const videoStartTime = Date.now();
-    
     context.setDefaultTimeout(0);
     context.setDefaultNavigationTimeout(0);
     const page = context.pages()[0];
     
-    console.log("Waiting for app page to load...");
-    // Just a basic wait, identical to the "smooth damn good" version
-    await page.waitForTimeout(3000);
-    
-    // 2. Start FFmpeg to record ONLY audio
+    // 2. Start FFmpeg immediately so audio and video are perfectly synced from the very beginning
     console.log("Starting FFmpeg audio recording...");
-    const audioStartTime = Date.now();
-    const audioOffsetSeconds = (audioStartTime - videoStartTime) / 1000.0;
-    
     const audioOutputFile = path.join(process.cwd(), 'audio.m4a');
     if (fs.existsSync(audioOutputFile)) fs.unlinkSync(audioOutputFile);
 
@@ -94,10 +85,19 @@ async function executeRecordingSession() {
         console.error(`FFMPEG AUDIO ERROR: ${err}`);
     });
     
+    // 3. Now that both recorders are actively running in sync, navigate to the target!
+    console.log(`Navigating to ${targetUrl}...`);
+    try {
+        // Use domcontentloaded so it doesn't wait forever for streaming sockets to close
+        await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
+    } catch (e) {
+        console.log("Navigation timeout or error, proceeding anyway:", e.message);
+    }
+    
     console.log("Waiting before interacting...");
     await page.waitForTimeout(5000);
     
-    // 3. Attempt to interact and play music
+    // 4. Attempt to interact and play music
     console.log("Attempting to start audio playback...");
     
     try {
@@ -156,7 +156,7 @@ async function executeRecordingSession() {
         console.log("Auto-play interaction failed:", err.message);
     }
     
-    // 4. Wait for a specific duration to record
+    // 5. Wait for a specific duration to record
     console.log(`Recording for ${recordingDuration / 1000} seconds...`);
     await page.waitForTimeout(recordingDuration);
     
@@ -165,7 +165,7 @@ async function executeRecordingSession() {
         videoPath = await page.video().path();
     } catch (e) {}
     
-    // 5. Terminate processes
+    // 6. Terminate processes
     console.log("Stopping audio recording and closing browser...");
     await context.close();
     
@@ -175,14 +175,14 @@ async function executeRecordingSession() {
         setTimeout(resolve, 3000);
     });
 
-    console.log(`Merging Playwright video and FFmpeg audio with ${audioOffsetSeconds.toFixed(3)}s video offset...`);
+    console.log("Merging Playwright video and FFmpeg audio directly...");
     const outputPath = path.join(process.cwd(), 'output.mp4');
     if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath);
     
     if (videoPath && fs.existsSync(videoPath)) {
         try {
-            // Use -ss on the video input to perfectly sync it with the audio that started later
-            execSync(`ffmpeg -y -ss ${audioOffsetSeconds.toFixed(3)} -i "${videoPath}" -i "${audioOutputFile}" -c:v libx264 -preset fast -crf 18 -c:a aac "${outputPath}"`);
+            // Direct merge without any trimming because they were started simultaneously
+            execSync(`ffmpeg -y -i "${videoPath}" -i "${audioOutputFile}" -c:v libx264 -preset fast -crf 18 -c:a aac "${outputPath}"`);
             console.log("Merge complete! Output saved to output.mp4");
             
             fs.unlinkSync(videoPath);
