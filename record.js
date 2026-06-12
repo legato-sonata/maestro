@@ -33,6 +33,38 @@ async function executeRecordingSession() {
     }
     fs.mkdirSync(videosDir);
 
+    console.log("Launching Chromium in App Mode with Playwright Video Recording...");
+    
+    // 1. Launch persistent context with App Mode pointing to about:blank
+    const context = await chromium.launchPersistentContext('', {
+        headless: false,
+        ignoreDefaultArgs: ['--enable-automation'],
+        viewport: { width: viewportWidth, height: viewportHeight },
+        recordVideo: {
+            dir: videosDir,
+            size: { width: viewportWidth, height: viewportHeight }
+        },
+        args: [
+            `--app=about:blank`,
+            `--window-size=${viewportWidth},${viewportHeight}`,
+            '--window-position=0,0',
+            '--autoplay-policy=no-user-gesture-required',
+            '--kiosk',
+            '--disable-infobars',
+            '--disable-dev-shm-usage',
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-gpu'
+        ]
+    });
+    
+    context.setDefaultTimeout(0);
+    context.setDefaultNavigationTimeout(0);
+    
+    // App mode uses the first page created by launchPersistentContext
+    const page = context.pages()[0];
+    
+    // 2. Start FFmpeg to record ONLY audio BEFORE navigating
     console.log("Starting FFmpeg audio recording...");
     const audioOutputFile = path.join(process.cwd(), 'audio.m4a');
     if (fs.existsSync(audioOutputFile)) fs.unlinkSync(audioOutputFile);
@@ -54,40 +86,15 @@ async function executeRecordingSession() {
     ffmpegProcess.on('error', (err) => {
         console.error(`FFMPEG AUDIO ERROR: ${err}`);
     });
+    
+    // Give FFmpeg a brief moment to initialize
+    await page.waitForTimeout(500);
 
-    console.log("Launching Chromium in App Mode with Playwright Video Recording...");
-    
-    // 1. Launch persistent context with App Mode
-    const context = await chromium.launchPersistentContext('', {
-        headless: false,
-        ignoreDefaultArgs: ['--enable-automation'],
-        viewport: { width: viewportWidth, height: viewportHeight },
-        recordVideo: {
-            dir: videosDir,
-            size: { width: viewportWidth, height: viewportHeight }
-        },
-        args: [
-            `--app=${targetUrl}`,
-            `--window-size=${viewportWidth},${viewportHeight}`,
-            '--window-position=0,0',
-            '--autoplay-policy=no-user-gesture-required',
-            '--kiosk',
-            '--disable-infobars',
-            '--disable-dev-shm-usage',
-            '--no-sandbox',
-            '--disable-setuid-sandbox',
-            '--disable-gpu'
-        ]
-    });
-    
-    context.setDefaultTimeout(0);
-    context.setDefaultNavigationTimeout(0);
-    
-    // App mode uses the first page created by launchPersistentContext
-    const page = context.pages()[0];
+    // 3. Navigate to the actual target URL
+    console.log(`Navigating to ${targetUrl}...`);
+    await page.goto(targetUrl, { timeout: 0 });
     
     console.log("Waiting for app page to load...");
-    // Give it a moment to load since we already told it the URL via --app=...
     await page.waitForTimeout(3000);
     
     console.log("Waiting before interacting...");
