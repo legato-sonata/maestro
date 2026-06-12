@@ -53,11 +53,13 @@ async function executeRecordingSession() {
         '-y', 
         '-f', 'x11grab', 
         '-video_size', viewportWidth + 'x' + viewportHeight,
+        '-framerate', '30',
         '-i', displayPort, 
         '-f', 'pulse',
         '-i', 'default',
         '-c:v', 'libx264',
         '-preset', 'ultrafast',
+        '-b:v', '10M',
         '-c:a', 'aac',
         'output.mp4'
     ]);
