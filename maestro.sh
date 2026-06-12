@@ -11,9 +11,26 @@ else
     exit 1
 fi
 
-FULL_REPO_PATH="$GITHUB_USERNAME/$REPOSITORY_NAME"
+# Determine target repository
+if [ -n "$GITHUB_USERNAME" ] && [ -n "$REPOSITORY_NAME" ] && [ "$GITHUB_USERNAME" != "your-username" ]; then
+    FULL_REPO_PATH="$GITHUB_USERNAME/$REPOSITORY_NAME"
+    REPO_NAME="$REPOSITORY_NAME"
+else
+    echo "Auto-detecting current repository..."
+    FULL_REPO_PATH=$(gh repo view --json nameWithOwner -q .nameWithOwner 2>/dev/null)
+    if [ -z "$FULL_REPO_PATH" ]; then
+        echo "Fatal Error: Could not detect GitHub repository. Please push to GitHub or set GITHUB_USERNAME and REPOSITORY_NAME in maestro.env."
+        exit 1
+    fi
+    REPO_NAME="${FULL_REPO_PATH#*/}"
+fi
 
-echo "Step 1: Creating Codespace for $FULL_REPO_PATH"
+# Determine branch
+if [ -z "$BRANCH" ] || [ "$BRANCH" == "main" ]; then
+    BRANCH=$(git branch --show-current 2>/dev/null || echo "main")
+fi
+
+echo "Step 1: Creating Codespace for $FULL_REPO_PATH on branch $BRANCH..."
 # The --json and --jq flags extract only the raw Codespace ID string
 CODESPACE_ID=$(gh codespace create --repo $FULL_REPO_PATH --branch $BRANCH --machine $MACHINE_TYPE --json name --jq .name)
 
@@ -30,7 +47,7 @@ gh codespace ssh --codespace $CODESPACE_ID -- "npm run record"
 
 echo "Step 3: Downloading the MP4 artifact..."
 # Securely copy the output.mp4 file to the local directory
-gh codespace cp remote:/workspaces/$REPOSITORY_NAME/output.mp4 ./demo-recording.mp4 --codespace $CODESPACE_ID
+gh codespace cp remote:/workspaces/$REPO_NAME/output.mp4 ./demo-recording.mp4 --codespace $CODESPACE_ID
 
 echo "Step 4: Deleting Codespace..."
 # Delete the codespace to prevent quota consumption
