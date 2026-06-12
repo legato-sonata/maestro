@@ -33,6 +33,28 @@ async function executeRecordingSession() {
     }
     fs.mkdirSync(videosDir);
 
+    console.log("Starting FFmpeg audio recording...");
+    const audioOutputFile = path.join(process.cwd(), 'audio.m4a');
+    if (fs.existsSync(audioOutputFile)) fs.unlinkSync(audioOutputFile);
+
+    const ffmpegProcess = spawn('ffmpeg', [
+        '-y', 
+        '-thread_queue_size', '1024',
+        '-f', 'pulse',
+        '-i', 'default',
+        '-c:a', 'aac',
+        '-b:a', '128k',
+        audioOutputFile
+    ]);
+    
+    ffmpegProcess.stderr.on('data', (data) => {
+        fs.appendFileSync(logFile, `FFMPEG AUDIO LOG: ${data}\n`);
+    });
+    
+    ffmpegProcess.on('error', (err) => {
+        console.error(`FFMPEG AUDIO ERROR: ${err}`);
+    });
+
     console.log("Launching Chromium in App Mode with Playwright Video Recording...");
     
     // 1. Launch persistent context with App Mode
@@ -67,29 +89,6 @@ async function executeRecordingSession() {
     console.log("Waiting for app page to load...");
     // Give it a moment to load since we already told it the URL via --app=...
     await page.waitForTimeout(3000);
-    
-    // 2. Start FFmpeg to record ONLY audio
-    console.log("Starting FFmpeg audio recording...");
-    const audioOutputFile = path.join(process.cwd(), 'audio.m4a');
-    if (fs.existsSync(audioOutputFile)) fs.unlinkSync(audioOutputFile);
-
-    const ffmpegProcess = spawn('ffmpeg', [
-        '-y', 
-        '-thread_queue_size', '1024',
-        '-f', 'pulse',
-        '-i', 'default',
-        '-c:a', 'aac',
-        '-b:a', '128k',
-        audioOutputFile
-    ]);
-    
-    ffmpegProcess.stderr.on('data', (data) => {
-        fs.appendFileSync(logFile, `FFMPEG AUDIO LOG: ${data}\n`);
-    });
-    
-    ffmpegProcess.on('error', (err) => {
-        console.error(`FFMPEG AUDIO ERROR: ${err}`);
-    });
     
     console.log("Waiting before interacting...");
     await page.waitForTimeout(5000);
