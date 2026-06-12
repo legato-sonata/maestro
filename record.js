@@ -1,6 +1,7 @@
 import { chromium } from 'playwright';
-import { spawn } from 'child_process';
+import { spawn, execSync } from 'child_process';
 import fs from 'fs';
+import path from 'path';
 
 const logFile = 'maestro.log';
 fs.writeFileSync(logFile, ''); // Clear previous log
@@ -25,16 +26,29 @@ async function executeRecordingSession() {
     const targetUrl = process.env.TARGET_URL || 'https://en.wikipedia.org/wiki/Main_Page';
     const recordingDuration = parseInt(process.env.RECORDING_DURATION_MS) || 10000;
     
-    // 1. Launch the browser
-    console.log("Launching Chromium...");
-    const browser = await chromium.launch({
-        headless: false, 
+    // Ensure videos directory exists
+    const videosDir = path.join(process.cwd(), 'videos');
+    if (fs.existsSync(videosDir)) {
+        fs.rmSync(videosDir, { recursive: true, force: true });
+    }
+    fs.mkdirSync(videosDir);
+
+    console.log("Launching Chromium in App Mode with Playwright Video Recording...");
+    
+    // 1. Launch persistent context with App Mode
+    const context = await chromium.launchPersistentContext('', {
+        headless: false,
         ignoreDefaultArgs: ['--enable-automation'],
+        viewport: { width: viewportWidth, height: viewportHeight },
+        recordVideo: {
+            dir: videosDir,
+            size: { width: viewportWidth, height: viewportHeight }
+        },
         args: [
-            '--window-size=' + viewportWidth + ',' + viewportHeight,
+            `--app=${targetUrl}`,
+            `--window-size=${viewportWidth},${viewportHeight}`,
             '--window-position=0,0',
             '--autoplay-policy=no-user-gesture-required',
-            '--start-fullscreen',
             '--kiosk',
             '--disable-infobars',
             '--disable-dev-shm-usage',
@@ -44,65 +58,43 @@ async function executeRecordingSession() {
         ]
     });
     
-    const context = await browser.newContext({
-        viewport: { width: viewportWidth, height: viewportHeight }
-    });
+    context.setDefaultTimeout(0);
+    context.setDefaultNavigationTimeout(0);
     
-    const page = await context.newPage();
-    page.setDefaultTimeout(0);
-    page.setDefaultNavigationTimeout(0);
+    // App mode uses the first page created by launchPersistentContext
+    const page = context.pages()[0];
     
-    // 2. Navigate to the target URL
-    console.log("Navigating to URL...");
-    await page.goto(targetUrl, { timeout: 0 });
+    console.log("Waiting for app page to load...");
+    // Give it a moment to load since we already told it the URL via --app=...
+    await page.waitForTimeout(3000);
     
-    // 3. Start the FFmpeg recording process
-    console.log("Starting FFmpeg recording...");
-    const displayPort = process.env.DISPLAY || ':99';
-    
+    // 2. Start FFmpeg to record ONLY audio
+    console.log("Starting FFmpeg audio recording...");
+    const audioOutputFile = path.join(process.cwd(), 'audio.m4a');
+    if (fs.existsSync(audioOutputFile)) fs.unlinkSync(audioOutputFile);
+
     const ffmpegProcess = spawn('ffmpeg', [
         '-y', 
-        '-use_wallclock_as_timestamps', '1',
-        '-thread_queue_size', '1024',
-        '-f', 'x11grab', 
-        '-video_size', viewportWidth + 'x' + viewportHeight,
-        '-framerate', '30',
-        '-i', displayPort, 
-        '-use_wallclock_as_timestamps', '1',
         '-thread_queue_size', '1024',
         '-f', 'pulse',
         '-i', 'default',
-        '-c:v', 'libx264',
-        '-preset', 'fast',
-        '-crf', '18',
         '-c:a', 'aac',
-        '-fps_mode', 'cfr',
-        'output.mp4'
+        '-b:a', '128k',
+        audioOutputFile
     ]);
     
     ffmpegProcess.stderr.on('data', (data) => {
-        console.error(`FFMPEG LOG: ${data}`);
+        fs.appendFileSync(logFile, `FFMPEG AUDIO LOG: ${data}\n`);
     });
     
     ffmpegProcess.on('error', (err) => {
-        console.error(`FFMPEG ERROR: ${err}`);
+        console.error(`FFMPEG AUDIO ERROR: ${err}`);
     });
     
-    // Give FFmpeg a brief moment to initialize before playing audio
-    // And give the page some extra time to fully load before interaction
     console.log("Waiting before interacting...");
     await page.waitForTimeout(5000);
     
-    // Attempt to force fullscreen (hides tabs and URL bar)
-    try {
-        console.log("Pressing F11 for fullscreen...");
-        await page.keyboard.press('F11');
-        await page.waitForTimeout(1000);
-    } catch (e) {
-        console.log("Could not press F11", e);
-    }
-    
-    // 3.5 Attempt to interact and play music
+    // 3. Attempt to interact and play music
     console.log("Attempting to start audio playback...");
     
     // Attempt to dismiss cookie consent popups universally
@@ -137,7 +129,6 @@ async function executeRecordingSession() {
         
         for (const selector of playSelectors) {
             const el = page.locator(selector).first();
-            // Use a short timeout of 2000ms instead of waiting forever
             try {
                 if (await el.isVisible({ timeout: 2000 })) {
                     await el.click();
@@ -152,16 +143,13 @@ async function executeRecordingSession() {
         
         if (!clicked) {
             console.log("No explicit play button found. Attempting keyboard shortcuts and fallback clicks.");
-            // YouTube play/pause shortcut
             await page.keyboard.press('k');
             await page.waitForTimeout(500);
-            // Universal play shortcut
             await page.keyboard.press('Space');
             await page.waitForTimeout(500);
             
             await page.mouse.click(viewportWidth / 2, viewportHeight / 2);
             
-            // Force play any video elements
             await page.evaluate(() => {
                 document.querySelectorAll('video, audio').forEach(v => v.play().catch(() => {}));
             });
@@ -174,17 +162,45 @@ async function executeRecordingSession() {
     console.log(`Recording for ${recordingDuration / 1000} seconds...`);
     await page.waitForTimeout(recordingDuration);
     
-    // 5. Terminate processes
-    console.log("Stopping recording and closing browser...");
-    await browser.close();
+    // Get the video path BEFORE closing the context
+    let videoPath = null;
+    try {
+        videoPath = await page.video().path();
+    } catch (e) {
+        console.error("Failed to retrieve Playwright video path.");
+    }
     
-    // Send SIGINT and wait for FFmpeg to flush the MP4 moov atom
+    // 5. Terminate processes
+    console.log("Stopping audio recording and closing browser...");
+    await context.close(); // Finalizes the WebM video file
+    
     ffmpegProcess.kill('SIGINT');
     await new Promise((resolve) => {
         ffmpegProcess.on('exit', resolve);
         // Fallback timeout in case FFmpeg hangs
         setTimeout(resolve, 3000);
     });
+
+    console.log("Merging Playwright video and FFmpeg audio...");
+    const outputPath = path.join(process.cwd(), 'output.mp4');
+    if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath);
+    
+    if (videoPath && fs.existsSync(videoPath)) {
+        try {
+            // Use FFmpeg to merge video and audio, convert to standard H264 MP4
+            execSync(`ffmpeg -y -i "${videoPath}" -i "${audioOutputFile}" -c:v libx264 -preset fast -crf 18 -c:a aac "${outputPath}"`);
+            console.log("Merge complete! Output saved to output.mp4");
+            
+            // Clean up raw files
+            fs.unlinkSync(videoPath);
+            fs.unlinkSync(audioOutputFile);
+        } catch (err) {
+            console.error("Failed to merge video and audio: " + err.message);
+        }
+    } else {
+        console.error("Cannot merge: Playwright video file not found.");
+    }
+
     console.log("Recording session complete.");
 }
 
